@@ -10,7 +10,7 @@ const gameStore = useGameStore()
 const searchQuery = ref('')
 const selectedCategory = ref('all')
 const sidebarOpen = ref(false)
-let searchTimeout: NodeJS.Timeout | null = null
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 const categories = [
   { id: 'all', name: 'Todas as Categorias', icon: '📋' },
