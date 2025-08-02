@@ -11,30 +11,42 @@ const api = axios.create({
 
 // Função para detectar se estamos no Netlify
 const isNetlify = () => {
-  return typeof window !== 'undefined' && window.location.hostname.includes('netlify.app')
+  return typeof window !== 'undefined' &&
+         (window.location.hostname.includes('netlify.app') ||
+          window.location.hostname.includes('netlify.com'))
 }
 
 // Função para fazer chamadas com fallback
 export const apiCall = async (endpoint: string) => {
+  console.log('🔍 API Call - Environment check:', {
+    hostname: typeof window !== 'undefined' ? window.location.hostname : 'server',
+    isNetlify: isNetlify(),
+    endpoint
+  })
+
   try {
     // Se estiver no Netlify, usar a função serverless
     if (isNetlify()) {
+      console.log('🚀 Using Netlify serverless function')
       const response = await axios.get(`/.netlify/functions/api-proxy?endpoint=${endpoint}`)
+      console.log('✅ Netlify function response:', response.data)
       return response
     }
 
     // Se estiver em desenvolvimento, usar proxy local
     if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      console.log('🛠️ Using local development proxy')
       const response = await axios.get(`/api${endpoint}`)
       return response
     }
 
     // Em produção (não Netlify), tentar API direta
+    console.log('🌐 Using direct API call')
     const response = await api.get(endpoint)
     return response
 
   } catch (error) {
-    console.warn('Primary API call failed, trying fallback...')
+    console.warn('❌ Primary API call failed, trying fallback...', error instanceof Error ? error.message : String(error))
 
     // Fallback: tentar diferentes URLs
     const urls = [
@@ -48,10 +60,12 @@ export const apiCall = async (endpoint: string) => {
 
     for (const url of urls) {
       try {
+        console.log(`🔄 Trying fallback URL: ${url}`)
         const response = await axios.get(url, { timeout: 10000 })
+        console.log('✅ Fallback successful:', url)
         return response
       } catch (fallbackError) {
-        console.warn(`Failed to fetch from ${url}:`, fallbackError)
+        console.warn(`❌ Failed to fetch from ${url}:`, fallbackError instanceof Error ? fallbackError.message : String(fallbackError))
         continue
       }
     }
