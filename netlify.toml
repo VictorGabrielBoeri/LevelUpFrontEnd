@@ -4,6 +4,9 @@
   
   # Comando de build
   command = "npm run build"
+  
+  # Diretório das funções serverless
+  functions = "netlify/functions"
 
 [build.environment]
   # Versão do Node.js
@@ -33,5 +36,11 @@
 # Headers para index.html
 [[headers]]
   for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Headers para funções serverless
+[[headers]]
+  for = "/.netlify/functions/*"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate" 

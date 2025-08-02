@@ -9,28 +9,55 @@ const api = axios.create({
   }
 })
 
-// Função para tentar diferentes URLs da API
-const tryApiCall = async (endpoint: string) => {
-  const urls = [
-    // API direta (produção)
-    `https://www.freetogame.com/api${endpoint}`,
-    // Proxy CORS público como fallback
-    `https://cors-anywhere.herokuapp.com/https://www.freetogame.com/api${endpoint}`,
-    // Outro proxy CORS
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://www.freetogame.com/api${endpoint}`)}`
-  ]
+// Função para detectar se estamos no Netlify
+const isNetlify = () => {
+  return typeof window !== 'undefined' && window.location.hostname.includes('netlify.app')
+}
 
-  for (const url of urls) {
-    try {
-      const response = await axios.get(url!, { timeout: 10000 })
+// Função para fazer chamadas com fallback
+export const apiCall = async (endpoint: string) => {
+  try {
+    // Se estiver no Netlify, usar a função serverless
+    if (isNetlify()) {
+      const response = await axios.get(`/.netlify/functions/api-proxy?endpoint=${endpoint}`)
       return response
-    } catch (error) {
-      console.warn(`Failed to fetch from ${url}:`, error)
-      continue
     }
-  }
 
-  throw new Error('Todas as tentativas de conexão falharam')
+    // Se estiver em desenvolvimento, usar proxy local
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      const response = await axios.get(`/api${endpoint}`)
+      return response
+    }
+
+    // Em produção (não Netlify), tentar API direta
+    const response = await api.get(endpoint)
+    return response
+
+  } catch (error) {
+    console.warn('Primary API call failed, trying fallback...')
+
+    // Fallback: tentar diferentes URLs
+    const urls = [
+      // API direta
+      `https://www.freetogame.com/api${endpoint}`,
+      // Proxy CORS público
+      `https://cors-anywhere.herokuapp.com/https://www.freetogame.com/api${endpoint}`,
+      // Outro proxy CORS
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://www.freetogame.com/api${endpoint}`)}`
+    ]
+
+    for (const url of urls) {
+      try {
+        const response = await axios.get(url, { timeout: 10000 })
+        return response
+      } catch (fallbackError) {
+        console.warn(`Failed to fetch from ${url}:`, fallbackError)
+        continue
+      }
+    }
+
+    throw new Error('Todas as tentativas de conexão falharam')
+  }
 }
 
 // Interceptor para tratamento de erros
@@ -58,18 +85,5 @@ api.interceptors.response.use(
     }
   }
 )
-
-// Função para fazer chamadas com fallback
-export const apiCall = async (endpoint: string) => {
-  try {
-    // Primeiro tenta com a configuração padrão
-    const response = await api.get(endpoint)
-    return response
-  } catch (error) {
-    console.warn('Primary API call failed, trying fallback...')
-    // Se falhar, tenta com os proxies alternativos
-    return await tryApiCall(endpoint)
-  }
-}
 
 export default api
